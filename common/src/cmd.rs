@@ -171,6 +171,7 @@ lazy_static! {
             theropod,
             dragon,
             golem,
+            arthropod,
         );
 
         souls

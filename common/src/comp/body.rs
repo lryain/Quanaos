@@ -1,3 +1,4 @@
+pub mod arthropod;
 pub mod biped_large;
 pub mod biped_small;
 pub mod bird_large;
@@ -48,6 +49,7 @@ make_case_elim!(
         Theropod(body: theropod::Body) = 12,
         QuadrupedLow(body: quadruped_low::Body) = 13,
         Ship(body: ship::Body) = 14,
+        Arthropod(body: arthropod::Body) = 15,
     }
 );
 
@@ -85,6 +87,7 @@ pub struct AllBodies<BodyMeta, SpeciesMeta> {
     pub theropod: BodyData<BodyMeta, theropod::AllSpecies<SpeciesMeta>>,
     pub quadruped_low: BodyData<BodyMeta, quadruped_low::AllSpecies<SpeciesMeta>>,
     pub ship: BodyData<BodyMeta, ()>,
+    pub arthropod: BodyData<BodyMeta, arthropod::AllSpecies<SpeciesMeta>>,
 }
 
 /// Can only retrieve body metadata by direct index.
@@ -107,6 +110,7 @@ impl<BodyMeta, SpeciesMeta> core::ops::Index<NpcKind> for AllBodies<BodyMeta, Sp
             NpcKind::Archaeos => &self.theropod.body,
             NpcKind::Reddragon => &self.dragon.body,
             NpcKind::Crocodile => &self.quadruped_low.body,
+            NpcKind::Tarantula => &self.arthropod.body,
         }
     }
 }
@@ -132,6 +136,7 @@ impl<'a, BodyMeta, SpeciesMeta> core::ops::Index<&'a Body> for AllBodies<BodyMet
             Body::Golem(_) => &self.golem.body,
             Body::Theropod(_) => &self.theropod.body,
             Body::QuadrupedLow(_) => &self.quadruped_low.body,
+            Body::Arthropod(_) => &self.arthropod.body,
             Body::Ship(_) => &self.ship.body,
         }
     }
@@ -287,6 +292,7 @@ impl Body {
                 theropod::Species::Yale => 1_000.0,
             },
             Body::Ship(ship) => ship.mass().0,
+            Body::Arthropod(body) => 500.0,
         };
         Mass(m)
     }
@@ -383,6 +389,7 @@ impl Body {
                 theropod::Species::Woodraptor => Vec3::new(2.0, 3.0, 2.6),
                 theropod::Species::Yale => Vec3::new(1.5, 3.2, 4.0),
             },
+            Body::Arthropod(body) => Vec3::new(1.0, 1.0, 1.0),
         }
     }
 
@@ -557,6 +564,7 @@ impl Body {
                 _ => 700,
             },
             Body::Ship(_) => 10000,
+            Body::Arthropod(_) => 100,
         }
     }
 
@@ -660,6 +668,7 @@ impl Body {
                 _ => 20,
             },
             Body::Ship(_) => 500,
+            Body::Arthropod(_) => 50,
         }
     }
 

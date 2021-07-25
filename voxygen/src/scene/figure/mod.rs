@@ -19,7 +19,7 @@ use crate::{
     },
 };
 use anim::{
-    biped_large::BipedLargeSkeleton, biped_small::BipedSmallSkeleton,
+    arthropod::ArthropodSkeleton, biped_large::BipedLargeSkeleton, biped_small::BipedSmallSkeleton,
     bird_large::BirdLargeSkeleton, bird_medium::BirdMediumSkeleton, character::CharacterSkeleton,
     dragon::DragonSkeleton, fish_medium::FishMediumSkeleton, fish_small::FishSmallSkeleton,
     golem::GolemSkeleton, object::ObjectSkeleton, quadruped_low::QuadrupedLowSkeleton,
@@ -113,6 +113,7 @@ struct FigureMgrStates {
     golem_states: HashMap<EcsEntity, FigureState<GolemSkeleton>>,
     object_states: HashMap<EcsEntity, FigureState<ObjectSkeleton>>,
     ship_states: HashMap<EcsEntity, FigureState<ShipSkeleton>>,
+    arthropod_states: HashMap<EcsEntity, FigureState<ArthropodSkeleton>>,
 }
 
 impl FigureMgrStates {
@@ -133,6 +134,7 @@ impl FigureMgrStates {
             golem_states: HashMap::new(),
             object_states: HashMap::new(),
             ship_states: HashMap::new(),
+            arthropod_states: HashMap::new(),
         }
     }
 
@@ -194,6 +196,10 @@ impl FigureMgrStates {
             Body::Golem(_) => self.golem_states.get_mut(entity).map(DerefMut::deref_mut),
             Body::Object(_) => self.object_states.get_mut(entity).map(DerefMut::deref_mut),
             Body::Ship(_) => self.ship_states.get_mut(entity).map(DerefMut::deref_mut),
+            Body::Arthropod(_) => self
+                .arthropod_states
+                .get_mut(entity)
+                .map(DerefMut::deref_mut),
         }
     }
 
@@ -218,6 +224,7 @@ impl FigureMgrStates {
             Body::Golem(_) => self.golem_states.remove(entity).map(|e| e.meta),
             Body::Object(_) => self.object_states.remove(entity).map(|e| e.meta),
             Body::Ship(_) => self.ship_states.remove(entity).map(|e| e.meta),
+            Body::Arthropod(_) => self.arthropod_states.remove(entity).map(|e| e.meta),
         }
     }
 
@@ -238,6 +245,7 @@ impl FigureMgrStates {
         self.golem_states.retain(|k, v| f(k, &mut *v));
         self.object_states.retain(|k, v| f(k, &mut *v));
         self.ship_states.retain(|k, v| f(k, &mut *v));
+        self.arthropod_states.retain(|k, v| f(k, &mut *v));
     }
 
     fn count(&self) -> usize {
@@ -257,6 +265,7 @@ impl FigureMgrStates {
             + self.golem_states.len()
             + self.object_states.len()
             + self.ship_states.len()
+            + self.arthropod_states.len()
     }
 
     fn count_visible(&self) -> usize {
@@ -329,6 +338,11 @@ impl FigureMgrStates {
                 .iter()
                 .filter(|(_, c)| c.visible())
                 .count()
+            + self
+                .arthropod_states
+                .iter()
+                .filter(|(_, c)| c.visible())
+                .count()
             + self.ship_states.iter().filter(|(_, c)| c.visible()).count()
     }
 }
@@ -350,6 +364,7 @@ pub struct FigureMgr {
     object_model_cache: FigureModelCache<ObjectSkeleton>,
     ship_model_cache: FigureModelCache<ShipSkeleton>,
     golem_model_cache: FigureModelCache<GolemSkeleton>,
+    arthropod_model_cache: FigureModelCache<ArthropodSkeleton>,
     states: FigureMgrStates,
 }
 
@@ -372,6 +387,7 @@ impl FigureMgr {
             object_model_cache: FigureModelCache::new(),
             ship_model_cache: FigureModelCache::new(),
             golem_model_cache: FigureModelCache::new(),
+            arthropod_model_cache: FigureModelCache::new(),
             states: FigureMgrStates::default(),
         }
     }
@@ -404,6 +420,7 @@ impl FigureMgr {
         self.object_model_cache.clean(&mut self.col_lights, tick);
         self.ship_model_cache.clean(&mut self.col_lights, tick);
         self.golem_model_cache.clean(&mut self.col_lights, tick);
+        self.arthropod_model_cache.clean(&mut self.col_lights, tick);
     }
 
     pub fn update_lighting(&mut self, scene_data: &SceneData) {
@@ -3316,6 +3333,152 @@ impl FigureMgr {
                         body,
                     );
                 },
+                Body::Arthropod(body) => {
+                    let (model, skeleton_attr) = self.arthropod_model_cache.get_or_create_model(
+                        renderer,
+                        &mut self.col_lights,
+                        body,
+                        inventory,
+                        tick,
+                        player_camera_mode,
+                        player_character_state,
+                        &slow_jobs,
+                    );
+
+                    let state = self
+                        .states
+                        .arthropod_states
+                        .entry(entity)
+                        .or_insert_with(|| {
+                            FigureState::new(renderer, ArthropodSkeleton::default(), body)
+                        });
+
+                    // Average velocity relative to the current ground
+                    let rel_avg_vel = state.avg_vel - physics.ground_vel;
+
+                    let (character, last_character) = match (character, last_character) {
+                        (Some(c), Some(l)) => (c, l),
+                        _ => continue,
+                    };
+
+                    if !character.same_variant(&last_character.0) {
+                        state.state_time = 0.0;
+                    }
+
+                    let target_base = match (
+                        physics.on_ground.is_some(),
+                        rel_vel.magnitude_squared() > MOVING_THRESHOLD_SQR, // Moving
+                        physics.in_liquid().is_some(),                      // In water
+                    ) {
+                        // Standing
+                        (true, false, false) => anim::arthropod::IdleAnimation::update_skeleton(
+                            &ArthropodSkeleton::default(),
+                            time,
+                            state.state_time,
+                            &mut state_animation_rate,
+                            skeleton_attr,
+                        ),
+                        // Running
+                        (true, true, false) => anim::arthropod::RunAnimation::update_skeleton(
+                            &ArthropodSkeleton::default(),
+                            (
+                                rel_vel,
+                                // TODO: Update to use the quaternion.
+                                ori * anim::vek::Vec3::<f32>::unit_y(),
+                                state.last_ori * anim::vek::Vec3::<f32>::unit_y(),
+                                time,
+                                rel_avg_vel,
+                                state.acc_vel,
+                            ),
+                            state.state_time,
+                            &mut state_animation_rate,
+                            skeleton_attr,
+                        ),
+                        // In air
+                        (false, _, false) => anim::arthropod::JumpAnimation::update_skeleton(
+                            &ArthropodSkeleton::default(),
+                            (
+                                rel_vel.magnitude(),
+                                // TODO: Update to use the quaternion.
+                                ori * anim::vek::Vec3::<f32>::unit_y(),
+                                state.last_ori * anim::vek::Vec3::<f32>::unit_y(),
+                                time,
+                                rel_avg_vel,
+                            ),
+                            state.state_time,
+                            &mut state_animation_rate,
+                            skeleton_attr,
+                        ),
+                        _ => anim::arthropod::IdleAnimation::update_skeleton(
+                            &ArthropodSkeleton::default(),
+                            time,
+                            state.state_time,
+                            &mut state_animation_rate,
+                            skeleton_attr,
+                        ),
+                    };
+                    let target_bones = match &character {
+                        CharacterState::ComboMelee(s) => {
+                            let stage_index = (s.stage - 1) as usize;
+                            let stage_time = s.timer.as_secs_f32();
+                            let stage_progress =
+                                if let Some(stage) = s.static_data.stage_data.get(stage_index) {
+                                    match s.stage_section {
+                                        StageSection::Buildup => {
+                                            stage_time / stage.base_buildup_duration.as_secs_f32()
+                                        },
+                                        StageSection::Swing => {
+                                            stage_time / stage.base_swing_duration.as_secs_f32()
+                                        },
+                                        StageSection::Recover => {
+                                            stage_time / stage.base_recover_duration.as_secs_f32()
+                                        },
+                                        _ => 0.0,
+                                    }
+                                } else {
+                                    0.0
+                                };
+                            match s.stage {
+                                1 => anim::arthropod::AlphaAnimation::update_skeleton(
+                                    &target_base,
+                                    (
+                                        rel_vel.magnitude(),
+                                        time,
+                                        Some(s.stage_section),
+                                        state.state_time,
+                                    ),
+                                    stage_progress,
+                                    &mut state_animation_rate,
+                                    skeleton_attr,
+                                ),
+                                _ => anim::arthropod::AlphaAnimation::update_skeleton(
+                                    &target_base,
+                                    (
+                                        rel_vel.magnitude(),
+                                        time,
+                                        Some(s.stage_section),
+                                        state.state_time,
+                                    ),
+                                    stage_progress,
+                                    &mut state_animation_rate,
+                                    skeleton_attr,
+                                ),
+                            }
+                        },
+                        // TODO!
+                        _ => target_base,
+                    };
+
+                    state.skeleton = anim::vek::Lerp::lerp(&state.skeleton, &target_bones, dt_lerp);
+                    state.update(
+                        renderer,
+                        &mut update_buf,
+                        &common_params,
+                        state_animation_rate,
+                        model,
+                        body,
+                    );
+                },
                 Body::BirdLarge(body) => {
                     let (model, skeleton_attr) = self.bird_large_model_cache.get_or_create_model(
                         renderer,
@@ -4954,6 +5117,7 @@ impl FigureMgr {
             object_model_cache,
             ship_model_cache,
             golem_model_cache,
+            arthropod_model_cache,
             states:
                 FigureMgrStates {
                     character_states,
@@ -4971,6 +5135,7 @@ impl FigureMgr {
                     golem_states,
                     object_states,
                     ship_states,
+                    arthropod_states,
                 },
         } = self;
         let col_lights = &*col_lights_;
@@ -5174,6 +5339,22 @@ impl FigureMgr {
                     (
                         state.bound(),
                         golem_model_cache.get_model(
+                            col_lights,
+                            body,
+                            inventory,
+                            tick,
+                            player_camera_mode,
+                            character_state,
+                        ),
+                    )
+                }),
+            Body::Arthropod(body) => arthropod_states
+                .get(&entity)
+                .filter(|state| filter_state(*state))
+                .map(move |state| {
+                    (
+                        state.bound(),
+                        arthropod_model_cache.get_model(
                             col_lights,
                             body,
                             inventory,

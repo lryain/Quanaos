@@ -1187,5 +1187,19 @@
                 generic: "Deadwood"
             ),
         )
-    )
+    ),
+    arthropod: (
+        body: (
+            keyword: "arthropod",
+            names_0: [
+                "Shelob"
+            ]
+        ),
+        species: (
+            tarantula: (
+                keyword: "tarantula",
+                generic: "Tarantula"
+            )
+        )
+    ),
 )
