@@ -2,7 +2,7 @@ use crate::{
     client::Client,
     comp::{
         agent::{Agent, AgentEvent, Sound, SoundKind},
-        arthropod, biped_large, bird_large, quadruped_low, quadruped_medium, quadruped_small,
+        biped_large, bird_large, quadruped_low, quadruped_medium, quadruped_small,
         skills::SkillGroupKind,
         theropod, BuffKind, BuffSource, PhysicsState,
     },
@@ -486,7 +486,7 @@ pub fn handle_destroy(server: &mut Server, entity: EcsEntity, cause: HealthSourc
                     _ => "common.loot_tables.creature.biped_large.default",
                 },
                 Some(common::comp::Body::Golem(_)) => "common.loot_tables.creature.golem",
-                Some(common::comp::Body::Arthropod(_)) => "common.loot_tables.creature.golem",
+                Some(common::comp::Body::Arthropod(_)) => "common.loot_tables.creature.arthropod",
                 Some(common::comp::Body::Theropod(theropod)) => match theropod.species {
                     theropod::Species::Sandraptor
                     | theropod::Species::Snowraptor

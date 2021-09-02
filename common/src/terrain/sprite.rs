@@ -176,6 +176,7 @@ make_case_elim!(
         EnsnaringVines = 0x95,
         WitchWindow = 0x96,
         SmokeDummy = 0x97,
+        EnsnaringWeb = 0x98,
     }
 );
 
@@ -261,7 +262,7 @@ impl SpriteKind {
             | SpriteKind::Tin
             | SpriteKind::Silver
             | SpriteKind::Gold => 0.6,
-            SpriteKind::EnsnaringVines => 0.1,
+            SpriteKind::EnsnaringVines | SpriteKind::EnsnaringWeb => 0.1,
             _ => return None,
         })
     }
