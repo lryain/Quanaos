@@ -6,8 +6,8 @@ use common::{
             Buffs,
         },
         fluid_dynamics::{Fluid, LiquidKind},
-        Energy, Health, HealthChange, HealthSource, Inventory, LightEmitter, ModifierKind,
-        PhysicsState, Stats,
+        Energy, EnergyChange, EnergySource, Health, HealthChange, HealthSource, Inventory,
+        LightEmitter, ModifierKind, PhysicsState, Stats,
     },
     event::{EventBus, ServerEvent},
     resources::DeltaTime,
@@ -89,7 +89,7 @@ impl<'a> System<'a> for Sys {
             if let Some(physics_state) = physics_state {
                 if matches!(
                     physics_state.on_ground.and_then(|b| b.get_sprite()),
-                    Some(SpriteKind::EnsnaringVines)
+                    Some(SpriteKind::EnsnaringVines) | Some(SpriteKind::EnsnaringWeb)
                 ) {
                     // If on ensnaring vines, apply ensnared debuff
                     server_emitter.emit(ServerEvent::Buff {
@@ -220,6 +220,38 @@ impl<'a> System<'a> for Sys {
                                     server_emitter.emit(ServerEvent::Damage {
                                         entity,
                                         change: HealthChange { amount, cause },
+                                    });
+                                    *accumulated = 0.0;
+                                };
+                            },
+                            BuffEffect::EnergyChangeOverTime {
+                                rate,
+                                accumulated,
+                                kind,
+                            } => {
+                                *accumulated += *rate * dt;
+                                // Apply energy change only once per second, per energy, or
+                                // when a buff is removed
+                                if accumulated.abs() > rate.abs().min(10.0)
+                                    || buff.time.map_or(false, |dur| dur == Duration::default())
+                                {
+                                    let source = if *accumulated > 0.0 {
+                                        EnergySource::Regen
+                                    } else {
+                                        EnergySource::Damage {
+                                            kind: DamageSource::Buff(buff.kind),
+                                            by: buff_owner,
+                                        }
+                                    };
+                                    let amount = match *kind {
+                                        ModifierKind::Additive => *accumulated as i32,
+                                        ModifierKind::Fractional => {
+                                            (health.maximum() as f32 * *accumulated) as i32
+                                        },
+                                    };
+                                    server_emitter.emit(ServerEvent::EnergyChange {
+                                        entity,
+                                        change: EnergyChange { amount, source },
                                     });
                                     *accumulated = 0.0;
                                 };

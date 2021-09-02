@@ -1,4 +1,4 @@
-use crate::{comp::Body, consts::ENERGY_PER_LEVEL};
+use crate::{comp::Body, consts::ENERGY_PER_LEVEL, uid::Uid, DamageSource};
 use serde::{Deserialize, Serialize};
 use specs::{Component, DerefFlaggedStorage};
 use specs_idvs::IdvStorage;
@@ -14,6 +14,7 @@ pub struct Energy {
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum EnergySource {
+    Damage { kind: DamageSource, by: Option<Uid> },
     Ability,
     Climb,
     LevelUp,
