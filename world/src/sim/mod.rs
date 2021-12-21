@@ -2130,7 +2130,8 @@ impl WorldSim {
     /// them spawning).
     pub fn get_near_trees(&self, wpos: Vec2<i32>) -> impl Iterator<Item = TreeAttr> + '_ {
         // Deterministic based on wpos
-        let normal_trees = std::array::IntoIter::new(self.gen_ctx.structure_gen.get(wpos))
+        // TODO: can use postfix .into_iter() when switching to Rust 2021
+        let normal_trees = IntoIterator::into_iter(self.gen_ctx.structure_gen.get(wpos))
             .filter_map(move |(wpos, seed)| {
                 let lottery = self.make_forest_lottery(wpos);
                 Some(TreeAttr {
